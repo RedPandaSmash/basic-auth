@@ -45,8 +45,8 @@ app.post("/signup", async (req, res) => {
   try {
     // check if username is already taken
     const uniqueUser = await User.findOne({ username: req.body.username });
-    // if info is valid
-    if (uniqueUser) {
+    // if there is no user with that username, go ahead with creating a new user
+    if (!uniqueUser) {
       bcrypt.hash(req.body.password, saltRounds, async (err, hash) => {
         let userDoc = {
           username: req.body.username,
@@ -57,8 +57,13 @@ app.post("/signup", async (req, res) => {
 
         user.save();
 
-        res.redirect("/");
+        console.log({ message: "New user signed up!", user: user });
+        res.redirect(`/dashboard/${userDoc.username}`);
       });
+    } else {
+      res
+        .status(400)
+        .json({ message: "A user with that username already exists." });
     }
   } catch (error) {
     res.status(500).json({ message: "something went wrong" });
@@ -70,14 +75,20 @@ app.post("/login", async (req, res) => {
   const { username, password } = req.body;
   try {
     let userObj = await User.findOne({ username: req.body.username });
-
-    bcrypt.compare(req.body.password, userObj.password, (err, result) => {
-      if (err) {
-        res.status(403).send("Access denied");
-      } else {
-        res.redirect(`/dashboard/${userObj.username}`);
-      }
-    });
+    // if no user is found with the username provided, end the function with a message
+    if (!userObj) {
+      return res.status(404).json({ message: "User not found." });
+    } else {
+      bcrypt.compare(req.body.password, userObj.password, (err, result) => {
+        if (err) {
+          res.status(403).send("Access denied");
+        } else if (!result) {
+          res.status(401).json({ message: "Incorrect password." });
+        } else {
+          res.redirect(`/dashboard/${userObj.username}`);
+        }
+      });
+    }
   } catch (error) {
     res.status(500).json({ message: "something went wrong" });
   }
